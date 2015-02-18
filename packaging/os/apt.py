@@ -270,6 +270,21 @@ def expand_dpkg_options(dpkg_options_compressed):
                        % (dpkg_options, dpkg_option)
     return dpkg_options.strip()
 
+
+def dpkg_options_dict(dpkg_options_compressed):
+    options_list = dpkg_options_compressed.split(',')
+    options_dict = dict()
+    for dpkg_option in options_list:
+        options_pair = dpkg_option.split('=')
+        key = options_pair[0]
+        try:
+            value = options_pair[1]
+        except IndexError:
+            value = None
+        options_dict[key] = value
+    return options_dict
+
+
 def expand_pkgspec_from_fnmatches(m, pkgspec, cache):
     new_pkgspec = []
     for pkgspec_pattern in pkgspec:
@@ -535,6 +550,7 @@ def main():
 
     install_recommends = p['install_recommends']
     dpkg_options = expand_dpkg_options(p['dpkg_options'])
+    dpkg_dict = dpkg_options_dict(p['dpkg_options'])
 
     # Deal with deprecated aliases
     if p['state'] == 'installed':
@@ -580,7 +596,10 @@ def main():
                         cache_valid = True
 
             if cache_valid is not True:
-                cache.update()
+                try:
+                    cache.update(sources_list=dpkg_dict.get('sourcelist'))
+                except TypeError:
+                    cache.update()  # fallback for older python-apt syntax
                 cache.open(progress=None)
             if not p['package'] and not p['upgrade'] and not p['deb']:
                 module.exit_json(changed=False)
