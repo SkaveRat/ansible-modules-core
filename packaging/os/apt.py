@@ -44,6 +44,13 @@ options:
     required: false
     default: no
     choices: [ "yes", "no" ]
+  sources_list:
+    description:
+      - Update only specified sources when using C(update_cache)
+    required: false
+    default: null
+    aliases: []
+    version_added: "1.9"
   cache_valid_time:
     description:
       - If C(update_cache) is specified and the last run is less or equal than I(cache_valid_time) seconds ago, the C(update_cache) gets skipped.
@@ -124,6 +131,9 @@ EXAMPLES = '''
 
 # Run the equivalent of "apt-get update" as a separate step
 - apt: update_cache=yes
+
+# Update only given sources list
+- apt: update_cache=yes sources_list=/etc/apt/sources.list.d/foobar.list
 
 # Only run "update_cache=yes" if the last one is more than 3600 seconds ago
 - apt: update_cache=yes cache_valid_time=3600
@@ -500,6 +510,7 @@ def main():
         argument_spec = dict(
             state = dict(default='present', choices=['installed', 'latest', 'removed', 'absent', 'present', 'build-dep']),
             update_cache = dict(default=False, aliases=['update-cache'], type='bool'),
+            sources_list = dict(default=None),
             cache_valid_time = dict(type='int'),
             purge = dict(default=False, type='bool'),
             package = dict(default=None, aliases=['pkg', 'name'], type='list'),
@@ -580,7 +591,10 @@ def main():
                         cache_valid = True
 
             if cache_valid is not True:
-                cache.update()
+                try:
+                    cache.update(sources_list=p['sources_list'])
+                except TypeError:
+                    cache.update() # fallback for older python-apt syntax. Version check not possible, due to missing __version__ attribute
                 cache.open(progress=None)
             if not p['package'] and not p['upgrade'] and not p['deb']:
                 module.exit_json(changed=False)
